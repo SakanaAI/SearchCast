@@ -1,0 +1,8 @@
+# Core dependencies for optuna_ridge.py
+# Pinned to recent-stable minimums; newer patch releases are expected to work.
+torch>=2.0
+numpy>=1.24
+pandas>=2.0
+scikit-learn>=1.3
+optuna>=3.4
+matplotlib>=3.7

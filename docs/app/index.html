@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Playground: Adaptive Ridge Forecasting</title>
+<link rel="icon" type="image/png" href="../assets/favicon.png">
+<link rel="stylesheet" href="../styles/demo.css">
+</head>
+<body>
+
+<div class="demo-shell">
+  <div class="col">
+    <div class="demo-toolbar">
+      <div class="breadcrumbs">
+        <a href="../index.html">&larr; Back to article</a>
+      </div>
+      <div class="right-actions">
+        <span class="backend-badge" id="backend-badge" title="In-browser compute backend">…</span>
+        <span id="data-status" class="mono"></span>
+      </div>
+    </div>
+
+    <header class="demo-header">
+      <h2>Adaptive HP Playground</h2>
+      <p>
+        Pre-fit ridge weights at the searched optimum for each (series, horizon).
+        Move the <strong>L</strong> or <strong>α</strong> slider to refit and
+        see how the prediction reacts.
+      </p>
+    </header>
+
+    <!-- METRICS HERO ROW (prominent, top of page) -->
+    <div class="metrics-hero">
+      <div class="metric-card primary">
+        <div class="key">Test MSE</div>
+        <div class="val" id="m-mse">—</div>
+        <div class="sub">lower is better</div>
+      </div>
+      <div class="metric-card">
+        <div class="key">Baseline MSE</div>
+        <div class="val" id="m-mae">—</div>
+        <div class="sub">global baseline (L=720, α=10⁻⁵)</div>
+      </div>
+      <div class="metric-card highlight">
+        <div class="key">vs global baseline</div>
+        <div class="val" id="m-delta">—</div>
+        <div class="sub">global mean+std scaler, L=720, α=10⁻⁵</div>
+      </div>
+      <div class="metric-card">
+        <div class="key">Fit time</div>
+        <div class="val" id="m-time">—</div>
+        <div class="sub" id="m-status">idle</div>
+      </div>
+      <span id="m-n" hidden></span>
+      <span id="m-stride" hidden></span>
+    </div>
+
+    <div class="demo-topbar">
+      <div class="field">
+        <label for="dataset-select">Dataset</label>
+        <select id="dataset-select"></select>
+      </div>
+      <div class="field">
+        <label for="series-select">Series</label>
+        <select id="series-select"></select>
+      </div>
+      <div class="field">
+        <label for="horizon-slider">Horizon&nbsp;H</label>
+        <div class="horizon-control">
+          <input type="range" id="horizon-slider" min="24" max="720" step="24" value="192">
+          <span class="horizon-readout" id="horizon-readout">192</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="hp-chip-row">
+      <div class="hp-chips" id="hp-chips"></div>
+      <button class="autotune-btn on" id="autotune-btn" type="button"
+              aria-pressed="true" title="When ON, sliders track the searched optimum. Drag L or α to switch OFF and refit.">
+        <span class="autotune-label">Autotune</span>
+        <span class="autotune-state">ON</span>
+      </button>
+    </div>
+
+    <div id="demo-plot"></div>
+
+    <div class="demo-controls">
+      <div class="control">
+        <label class="title" for="lookback-slider">Lookback (L)</label>
+        <div class="row">
+          <input type="range" id="lookback-slider" min="32" max="2048" step="8" value="96">
+          <span class="value" id="lookback-readout">96</span>
+        </div>
+        <div class="hint">Long lookbacks slow each fit; α-only changes are cached and fast.</div>
+      </div>
+
+      <div class="control">
+        <label class="title" for="alpha-slider">Regularization (log α)</label>
+        <div class="row">
+          <input type="range" id="alpha-slider" min="-3" max="6" step="0.1" value="0">
+          <span class="value" id="alpha-readout">α = 1.0</span>
+        </div>
+        <div class="hint">Other HPs (scaler, augmentation, local-norm fraction) are pinned to the searched optimum for the current horizon.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="status" id="status">working…</div>
+
+<script src="../scripts/vendor/plotly.min.js"></script>
+<script src="../scripts/vendor/papaparse.min.js"></script>
+<script src="demo.js"></script>
+</body>
+</html>

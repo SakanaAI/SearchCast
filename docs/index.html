@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How Good Can Linear Models Be for Time-Series Forecasting?</title>
+<meta name="description" content="A diagnostic study via Ridge regression with searched preprocessing, matching Transformer/MLP/CNN on six of eight benchmarks at a fraction of the compute.">
+<meta property="og:title" content="How Good Can Linear Models Be for Time-Series Forecasting?">
+<meta property="og:description" content="Ridge regression with searched preprocessing matches Transformer/MLP/CNN on six of eight standard benchmarks. Interactive playground included.">
+<meta property="og:image" content="assets/figures/teaser_panel_a.png">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles/main.css">
+<script>
+window.MathJax = {tex:{inlineMath:[['$','$'],['\\(','\\)']]}, svg:{fontCache:'global'}};
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+</head>
+
+<body>
+
+<header class="hero">
+  <div class="col">
+    <h1>How Good Can Linear Models Be<br>for Time-Series Forecasting?</h1>
+    <p class="subtitle">Ridge regression, with its preprocessing tuned, matches the deep models.</p>
+    <p class="authors">
+      Lang Huang<sup>1,2</sup> &nbsp; Jinglue Xu<sup>1</sup> &nbsp; Luke Darlow<sup>1</sup>
+      <span class="affil">&nbsp;·&nbsp; <a href="https://arxiv.org/abs/2606.27282">arXiv preprint</a></span>
+    </p>
+    <p class="affiliations">
+      <sup>1</sup>Sakana AI, Tokyo, Japan &nbsp; <sup>2</sup>National Institute of Informatics, Japan
+      &nbsp;·&nbsp; <a href="mailto:langhuang@sakana.ai">{langhuang, jingluexu, luke}@sakana.ai</a>
+    </p>
+    <div class="cta-row">
+      <a class="cta primary primary--glow" href="#playground"><span class="cta-inner">Launch the playground</span></a>
+      <a class="cta ghost" href="https://arxiv.org/abs/2606.27282">Read the paper</a>
+      <a class="cta ghost" href="https://github.com/SakanaAI/SearchCast">GitHub</a>
+    </div>
+    <figure class="hero-image">
+      <div class="la-widget hero" data-widget="lookback-span" data-layout="multi" data-autoplay="true"></div>
+      <figcaption>
+        Optimal forecasting context is heterogeneous and non-monotonic in horizon.
+        For each dataset, the colored segment marks the searched optimal lookback
+        $L^\star$ for the current forecast horizon $H$. Color is mapped from $H$
+        (cool = short, warm = long), and the segment's length is $L^\star(H)$.
+        As $H$ sweeps from 24 to 720, you can see $L^\star$ grow, plateau, or shrink
+        per dataset, and color the past with the same turbo ramp used in the paper.
+        Drag the slider to take over from auto-play.
+      </figcaption>
+    </figure>
+  </div>
+</header>
+
+
+<section class="tldr">
+  <div class="col">
+    <p class="section-eyebrow">tl;dr</p>
+    <h2>Linear models are not weak. Their preprocessing is under-tuned.</h2>
+    <ol>
+      <li>Closed-form Ridge regression, with only its <em>preprocessing</em> hyperparameters
+      searched (context length, local-normalization fraction $r$, regularization $\alpha$,
+      augmentation), matches or beats Transformer, MLP, and CNN baselines on
+      <strong>six of eight</strong> standard benchmarks, at orders-of-magnitude
+      lower training cost.</li>
+      <li>There is no universal lookback or normalization scheme. The optimal
+      $L^* \propto H^b$ has dataset-specific exponents from $-0.19$ on Exchange/Traffic
+      to $+0.46$ on ETTm2, contradicting the convention that longer horizons require
+      longer history.</li>
+      <li>The tuned hyperparameters <strong>expose</strong> scaling, locality, and
+      per-series structure — patterns larger models hide inside their weights.</li>
+    </ol>
+  </div>
+</section>
+
+
+<section id="adaptive-story">
+  <div class="col">
+    <p class="section-eyebrow">The adaptive context story</p>
+    <h2>One forecaster, eight datasets, eight different optima.</h2>
+    <p>
+      Time-series forecasting research has been moving steadily toward larger
+      architectures, on the assumption that capacity is what unlocks accuracy.
+      Most of that gap closes with cheaper preprocessing tuning, not bigger models.
+      Ridge regression makes the test concrete: a closed-form solution and interpretable
+      weights let the tuned hyperparameters be read off the search directly. The widget
+      below shows what the search finds. Drag the horizon slider, switch between
+      datasets, and watch the optimal lookback span grow, plateau, or shrink — set by
+      each dataset's stationarity, not by $H$.
+    </p>
+
+    <div class="la-widget" data-widget="lookback-span" data-layout="single" data-autoplay="true"></div>
+    <p class="result-card" style="font-size:13.5px; color: var(--color-text-muted); font-family: var(--font-sans); margin-top: 10px;">
+      Pick a dataset above; the colored span shows $L^\star(H)$ for that dataset and horizon, anchored at the prediction-start line. The numbers are the full searched optima per dataset.
+    </p>
+  </div>
+</section>
+
+
+<section id="playground-cta">
+  <div class="col">
+    <p class="section-eyebrow">Live playground</p>
+    <h2>Try the search yourself.</h2>
+    <p>
+      Pick a dataset, series, and forecast horizon, then drag the lookback $L$ and
+      regularization $\alpha$ sliders to refit closed-form Ridge in your browser.
+      The remaining hyperparameters (scaler scope and method, augmentation, local-norm
+      fraction $r$) stay pinned to the searched optimum for the current horizon;
+      autotune snaps $L$ and $\alpha$ there too. Bundled datasets: ETTh1, ETTh2, and
+      Exchange.
+    </p>
+    <div class="demo-card" id="playground">
+      <video class="demo-preview" autoplay muted loop playsinline preload="metadata" controls>
+        <source src="demo_recording.mp4" type="video/mp4">
+        Your browser doesn't support embedded video.
+      </video>
+      <a class="cta primary" href="app/index.html">Launch the playground &rarr;</a>
+    </div>
+  </div>
+</section>
+
+
+<section id="method">
+  <div class="col">
+    <p class="section-eyebrow">Method</p>
+    <h2>Closed-form Ridge over a searched preprocessing space.</h2>
+    <p>
+      The pipeline is small: <span class="mono">sliding windows
+      &rarr; scaling &rarr; optional augmentation &rarr; closed-form Ridge</span>.
+      Optuna searches the preprocessing stages while the model class stays fixed.
+      Ridge has a closed form,
+      $\boldsymbol{\beta} = (X^\top X + \alpha I)^{-1} X^\top \mathbf{y}$,
+      so each trial is a few-millisecond Cholesky solve.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Hyperparameter</th><th>Range</th><th>Scale</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><span class="mono">lookback</span> $L$</td><td>32 &ndash; 2048</td><td>log-int</td></tr>
+        <tr><td>local-norm fraction $r$</td><td>$10^{-3}$ &ndash; $1$</td><td>log</td></tr>
+        <tr><td>regularization $\alpha$</td><td>$10^{-6}$ &ndash; $10^{4}$</td><td>log</td></tr>
+        <tr><td>scaler method</td><td>mean / robust</td><td>categorical</td></tr>
+        <tr><td>scaler scope</td><td>global / local</td><td>categorical</td></tr>
+        <tr><td>noise type</td><td>none / time / freq</td><td>categorical</td></tr>
+        <tr><td>noise intensity $\sigma$</td><td>$10^{-3}$ &ndash; $0.5$</td><td>log</td></tr>
+      </tbody>
+    </table>
+    <p>
+      Two grouping levers regularize the search: $g_h$ groups consecutive horizons
+      to share one HP setting (default 48; barely costs accuracy), and $g_s$ groups
+      series similarly (the optimal value is dataset-specific, ranging from fully
+      shared on ETTh1 to fully per-series on Weather).
+    </p>
+  </div>
+</section>
+
+
+<section id="patterns">
+  <div class="col">
+    <p class="section-eyebrow">Three diagnostic patterns</p>
+    <h2>What the search reveals about the data.</h2>
+
+    <div class="result-card">
+      <h3>1. Lookback scales with horizon, but the exponent flips sign.</h3>
+      <figure>
+        <div id="fig-lookback" class="native-plot"></div>
+        <figcaption>
+          Power-law fits $L^* \propto H^b$ over the eight benchmarks. Exponents
+          span $b = -0.19$ (Exchange, Traffic) to $b = +0.46$ (ETTm2). Weather and
+          Electricity sit near $|b| < 0.1$. Toggle dataset traces by clicking the
+          legend.
+        </figcaption>
+      </figure>
+      <p>
+        The standard $L=96$ default is therefore wrong in two opposite directions
+        at once: it underserves Weather and Electricity by an order of magnitude,
+        and overserves Exchange and Traffic at long horizons, where the optimum
+        drops below 96.
+      </p>
+    </div>
+
+    <div class="result-card">
+      <h3>2. Local normalization wins on a learned trailing fraction $r$.</h3>
+      <figure>
+        <div class="hp-heatmap-row">
+          <div id="fig-hm-etth1-r" class="native-plot"></div>
+          <div id="fig-hm-weather-r" class="native-plot"></div>
+        </div>
+        <figcaption>
+          Per-series heatmaps of $\log_{10} r$. ETTh1 (left) is visibly uniform
+          across its 7 variates; Weather (right) is dispersed. Optimal $\log_{10} r$
+          clusters in $[-2.5, -0.5]$, i.e., trailing fractions of 0.3&ndash;30%.
+        </figcaption>
+      </figure>
+      <p>
+        Prior linear forecasters normalize either globally or over the full input
+        window. The search instead picks a small recent slice — the inputs aren't
+        stationary across a window of length $L$. Robust (median/IQR) statistics
+        lost to mean/std on every dataset.
+      </p>
+    </div>
+
+    <div class="result-card">
+      <h3>3. Series within a dataset disagree.</h3>
+      <figure>
+        <div class="hp-heatmap-row">
+          <div id="fig-hm-etth1-a" class="native-plot"></div>
+          <div id="fig-hm-weather-a" class="native-plot"></div>
+        </div>
+        <figcaption>
+          Per-series heatmaps of $\log_{10} \alpha$. ETTh1's seven channels share a
+          regularization regime; Weather's 21 channels diverge sharply (OT
+          $\log_{10}\alpha \approx 1\text{--}2$ vs.\ others near $4$).
+        </figcaption>
+      </figure>
+      <p>
+        Channels of a single dataset can live on incompatible scales (Weather:
+        pressure, humidity, wind, rainfall) or be physically related (ETTh1
+        electricity-load transformers). The optimal degree of cross-series sharing
+        is therefore a property of the dataset, not a fixed design choice.
+      </p>
+    </div>
+  </div>
+</section>
+
+
+<section id="efficiency">
+  <div class="col">
+    <p class="section-eyebrow">Efficiency / accuracy tradeoffs</p>
+    <h2>How cheap can the search get?</h2>
+    <div class="result-card">
+      <h3>Horizon grouping is nearly free.</h3>
+      <figure>
+        <div id="fig-pareto" class="native-plot"></div>
+        <figcaption>
+          MSE degradation vs.\ horizon group size $g_h$, per dataset. Curves are
+          flat ($\leq 0.4\%$), so $g_h = 48$ costs almost nothing and frees the
+          trial budget for $g_s$ search.
+        </figcaption>
+      </figure>
+    </div>
+
+    <div class="result-card">
+      <h3>Augmentation helps about two-thirds of the time.</h3>
+      <figure>
+        <div id="fig-aug" class="native-plot"></div>
+        <figcaption>
+          Fraction of trials selecting each augmentation type, per dataset.
+          Augmentation is preferred in 60&ndash;70% of trials; time- and
+          frequency-domain noise split roughly evenly.
+        </figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+
+<section id="weights">
+  <div class="col">
+    <p class="section-eyebrow">Forecasts</p>
+    <h2>What the tuned model predicts.</h2>
+    <div class="result-card">
+      <figure>
+        <div id="fig-forecast" class="native-plot"></div>
+        <figcaption>
+          ETTh1 (series OT). The tuned local-Ridge prediction (teal) tracks the
+          slow drift in the ground truth (black). The baseline globally-scaled
+          Ridge (red) drifts back toward the dataset mean.
+        </figcaption>
+      </figure>
+    </div>
+    <p>
+      The same locality and seasonality the search recovers in the
+      hyperparameters are visible directly in the trained weights. See Figure 4
+      in the paper for the full lag-by-horizon weight heatmap across the eight
+      datasets.
+    </p>
+  </div>
+</section>
+
+
+<section id="bench">
+  <div class="col">
+    <p class="section-eyebrow">Benchmark results</p>
+    <h2>Long-term multivariate forecasting (MSE).</h2>
+    <p>
+      Per-horizon test MSE on the eight standard benchmarks. Within the linear
+      class, tuned Ridge takes the best average on seven of eight datasets and
+      ties FITS on ETTh2. Against nonlinear baselines, it wins the average on
+      six of eight benchmarks. <strong>Bold</strong> marks the best per row;
+      <span class="row-key second">underline</span> marks the second-best. OLS,
+      FITS, and DLinear are reproduced with instance normalization from
+      <a href="https://arxiv.org/abs/2403.14587">Toner et&nbsp;al.&nbsp;(2024)</a>;
+      nonlinear baselines come from their original publications.
+    </p>
+    <div id="fig-main-results" class="results-scroll"></div>
+  </div>
+</section>
+
+<section id="limitations">
+  <div class="col">
+    <p class="section-eyebrow">Limitations</p>
+    <h2>Scope notes.</h2>
+    <p>
+      The eight benchmarks are smooth sensor and energy series; the lookback-scaling
+      and locality patterns we report are best read as findings on this regime
+      rather than universal claims. We follow prior work in reporting point-estimate
+      MSE; very small margins should be treated as ties. Nonlinear baselines are
+      quoted from their original publications, so comparisons reflect their
+      published configurations rather than a jointly retuned protocol. Per-series
+      search scales with channel count; finer-grained search is an open direction.
+      The study fixes the model class to Ridge. Applying the same preprocessing
+      search to deeper models is the obvious next step.
+    </p>
+  </div>
+</section>
+
+
+<section id="cite">
+  <div class="col">
+    <p class="section-eyebrow">Citation</p>
+    <h2>BibTeX</h2>
+    <pre class="bibtex" id="bibtex"><button class="copy-btn" id="copy-bib" type="button">Copy</button><code>@article{huang2026linear,
+  title   = {How Good Can Linear Models Be for Time-Series Forecasting?},
+  author  = {Huang, Lang and Xu, Jinglue and Darlow, Luke},
+  journal = {arXiv preprint arXiv:2606.27282},
+  year    = {2026}
+}</code></pre>
+  </div>
+</section>
+
+
+<footer>
+  <div class="col">
+    <span>&copy; 2026 &middot; <a href="https://github.com/SakanaAI/SearchCast">GitHub repository</a></span>
+    <span>Questions? <a href="mailto:lang@nii.ac.jp">lang@nii.ac.jp</a></span>
+  </div>
+</footer>
+
+
+<script src="scripts/vendor/plotly.min.js"></script>
+<script src="assets/widget_a_data.js"></script>
+<script src="assets/figures_data.js"></script>
+<script src="scripts/widget_a.js" defer></script>
+<script src="scripts/figures.js" defer></script>
+<script>
+document.getElementById('copy-bib').addEventListener('click', () => {
+  const text = document.querySelector('#bibtex code').innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copy-bib');
+    const orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => (btn.textContent = orig), 1400);
+  });
+});
+</script>
+
+</body>
+</html>
